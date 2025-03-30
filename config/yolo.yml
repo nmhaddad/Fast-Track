@@ -20,7 +20,7 @@ tracker:
 
 db:
   db_uri: sqlite:///data/nba_Trim.db
-  use_gpt4v_captions: True
+  create_image_captions: True
 
 
 names: 

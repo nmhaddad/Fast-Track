@@ -18,16 +18,16 @@ logger.setLevel(logging.INFO)
 class SQLDatabase:
     """Database class to store information about tracks and detections."""
 
-    def __init__(self, db_uri: str, class_names: List[str], use_gpt4v_captions: bool = False):
+    def __init__(self, db_uri: str, class_names: List[str], create_image_captions: bool = False):
         """Inits Database class with a given database URI.
 
         Args:
             db_uri: database URI.
-            use_gpt4v_captions: bool to use GPT-4 Vision captions.
+            create_image_captions: bool to use VLM to generate image captions (OpenAI).
         """
         self.db_uri = db_uri
         self.class_names = class_names
-        self.use_gpt4v_captions = use_gpt4v_captions
+        self.create_image_captions = create_image_captions
 
         self.db = None
         self.job_id = None
@@ -96,7 +96,7 @@ class SQLDatabase:
                 frame_number=frame_number,
                 frame_base64=frame_base64,
                 time_created=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                gpt4v_caption=generate_frame_caption(frame_base64) if self.use_gpt4v_captions else None,
+                image_caption=generate_frame_caption(frame_base64) if self.create_image_captions else None,
                 job_id=self.job_id,
             )
         )

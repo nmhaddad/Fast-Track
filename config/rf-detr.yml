@@ -25,7 +25,7 @@ tracker:
 
 db:
   db_uri: sqlite:///data/hainan.db
-  use_gpt4v_captions: True
+  create_image_captions: True
 
 names:
   1: "person"
