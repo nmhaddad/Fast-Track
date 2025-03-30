@@ -11,6 +11,8 @@ from .third_party.rfdetr import RFDETR
 
 
 MODELS = {
+    "RF-DETR Large": "rfdetr_large",
+    "RF-DETR Base": "rfdetr_base",
     "YOLO-NAS L": "yolo_nas_l",
     "YOLO-NAS M": "yolo_nas_m",
     "YOLO-NAS S": "yolo_nas_s",
@@ -56,6 +58,6 @@ def get_detector(
     elif detector_type.startswith("yolov9"):
         return YOLOv9ONNX(weights_path=weights_path, names=names, image_shape=image_shape, **detector_params)
     elif detector_type.startswith("rfdetr"):
-        return RFDETR(weights_path=weights_path, names=names, image_shape=image_shape, **detector_params)
+        return RFDETR(weights_path=weights_path, model_name=detector_type, names=names, resolution=max(image_shape), **detector_params)
     else:
         raise ValueError("Detector name not found.")

@@ -28,8 +28,8 @@ def encode_image(image: np.ndarray) -> str:
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
-def generate_frame_caption(frame_base64: str, model: str = "gpt-4-vision-preview") -> np.ndarray:
-    """Generates a caption for a frame using GPT-4 Vision.
+def generate_frame_caption(frame_base64: str, model: str = "gpt-4o-mini") -> np.ndarray:
+    """Generates a caption for a frame using OpenAI.
 
     Args:
         frame: frame to generate a caption for
