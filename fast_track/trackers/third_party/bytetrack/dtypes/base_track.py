@@ -53,7 +53,7 @@ class BaseTrack(object):
             "count": self._count,
             "is_activated": self.is_activated,
             "state": self.state,
-            "score": self.score,
+            "score": float(self.score),
             "start_frame_number": self.start_frame,
             "curr_frame_number": self.frame_id,
             "time_since_update": self.time_since_update,

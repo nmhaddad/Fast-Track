@@ -25,7 +25,7 @@ tracker:
 
 db:
   db_uri: sqlite:///data/hainan.db
-  create_image_captions: True
+  create_image_captions: False
 
 names:
   1: "person"
