@@ -1,5 +1,6 @@
 """Utilities file"""
 
+import logging
 from typing import List
 
 import cv2
@@ -118,3 +119,18 @@ def read_names_file(names_file: str) -> List[str]:
     with open(names_file, "r", encoding="utf8") as file:
         names = [line.rstrip() for line in file]
     return names
+
+
+def create_logger() -> logging.Logger:
+    """Create a logger. Logs to stdout.
+    
+    Returns:
+        A logger object
+    """
+    logger = logging.getLogger("fast_track")
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger

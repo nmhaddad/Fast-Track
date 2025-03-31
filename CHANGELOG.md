@@ -1,7 +1,13 @@
 # CHANGELOG for Fast-Track
 
 ## Known Issues:
-- None
+- See GitHub Issues
+
+## v1.2.2 - Nate Haddad, 3/31/2025
+- Update track messages
+
+## v1.2.1 - Nate Haddad, 3/31/2025
+- Update image captions
 
 ## v1.2.0 - Nate Haddad, 3/27/2025
 - Add `RFDETR` to `detectors`

@@ -25,6 +25,9 @@ class STrack(BaseTrack):
         self.class_id = class_id
         self.class_id_history = {class_id: 1}
 
+        center_x, center_y, _, _, = self.tlwh_to_xyah(tlwh).astype(int).tolist()
+        self.location = (center_x, center_y)
+
     def predict(self):
         mean_state = self.mean.copy()
         if self.state != TrackState.Tracked:
