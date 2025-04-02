@@ -1,13 +1,13 @@
 from typing import Any, Dict, List
 
-import numpy as np
 import cv2
+import numpy as np
 
-from .kalman_filter import KalmanFilter
+from ...object_tracker import ObjectTracker
 from . import matching
 from .dtypes import STrack, TrackState
-from .utils import joint_stracks, sub_stracks, remove_duplicate_stracks
-from ...object_tracker import ObjectTracker
+from .kalman_filter import KalmanFilter
+from .utils import joint_stracks, remove_duplicate_stracks, sub_stracks
 
 
 class BYTETracker(ObjectTracker):
@@ -44,7 +44,12 @@ class BYTETracker(ObjectTracker):
         self.max_time_lost = self.buffer_size
         self.kalman_filter = KalmanFilter()
 
-    def update(self, bboxes, scores, class_ids, frame: np.ndarray):
+    def update(self, detections: List[Dict[str, Any]], frame: np.ndarray):
+        bboxes = np.array([detection["bbox"] for detection in detections])
+        scores = np.array([detection["confidence"] for detection in detections])
+        class_ids = np.array([detection["class_id"] for detection in detections])
+        detection_ids = np.array([detection["detection_id"] for detection in detections])
+
         self.frame_id += 1
         activated_stracks = []
         refind_stracks = []
@@ -59,10 +64,6 @@ class BYTETracker(ObjectTracker):
         #     scores = output_results[:, 4] * output_results[:, 5]
         #     bboxes = output_results[:, :4]  # x1y1x2y2
 
-        bboxes = np.array(bboxes)
-        scores = np.array(scores)
-        class_ids = np.array(class_ids)
-
         # if img_info and img_size:
         #     img_h, img_w = img_info[0], img_info[1]
         #     scale = min(img_size[0] / float(img_h), img_size[1] / float(img_w))
@@ -73,25 +74,36 @@ class BYTETracker(ObjectTracker):
         inds_high = scores < self.track_thresh
 
         inds_second = np.logical_and(inds_low, inds_high)
-        dets_second = bboxes[inds_second]
+
         dets = bboxes[remain_inds]
+        dets_second = bboxes[inds_second]
+
+        det_ids = detection_ids[remain_inds]
+        det_ids_second = detection_ids[inds_second]
+
         scores_keep = scores[remain_inds]
         scores_second = scores[inds_second]
+
         class_ids_keep = class_ids[remain_inds]
         class_ids_second = class_ids[inds_second]
 
         if len(dets) > 0:
             """Detections"""
             detections = [
-                STrack(STrack.tlbr_to_tlwh(tlbr), s, class_id)
-                for (tlbr, s, class_id) in zip(dets, scores_keep, class_ids_keep)
+                STrack(
+                    tlwh=STrack.tlbr_to_tlwh(tlbr),
+                    det_id=det_id,
+                    score=s,
+                    class_id=class_id,
+                )
+                for (tlbr, det_id, s, class_id) in zip(dets, det_ids, scores_keep, class_ids_keep)
             ]
         else:
             detections = []
 
         """ Add newly detected tracklets to tracked_stracks"""
-        unconfirmed = []
-        tracked_stracks = []  # type: list[STrack]
+        unconfirmed: List[STrack] = []
+        tracked_stracks: List[STrack] = []
         for track in self.tracked_stracks:
             if not track.is_activated:
                 unconfirmed.append(track)
@@ -122,8 +134,8 @@ class BYTETracker(ObjectTracker):
         if len(dets_second) > 0:
             """Detections"""
             detections_second = [
-                STrack(STrack.tlbr_to_tlwh(tlbr), s, class_id)
-                for (tlbr, s, class_id) in zip(dets_second, scores_second, class_ids_second)
+                STrack(tlwh=STrack.tlbr_to_tlwh(tlbr), det_id=det_id, score=s, class_id=class_id)
+                for (tlbr, det_id, s, class_id) in zip(dets_second, det_ids_second, scores_second, class_ids_second)
             ]
         else:
             detections_second = []

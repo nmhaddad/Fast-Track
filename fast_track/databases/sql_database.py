@@ -1,6 +1,6 @@
 """Database class to store information about tracks and detections."""
 
-from datetime import datetime
+import datetime
 import logging
 from typing import Any, Dict, List
 
@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from .schemas import Base, Detection, Frame, Job, Track
-from .utils import generate_frame_caption, encode_image
+from .utils import encode_image, generate_frame_caption
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -54,10 +54,21 @@ class SQLDatabase:
         """Commits the database session."""
         self.db.commit()
 
-    def update(self, track_messages: List[Dict[str, Any]]) -> None:
-        """Updates the database with tracks and detections."""
+    def update_detections(self, detections: List[Dict[str, Any]]) -> None:
+        """Updates the database with detections.
+
+        Args:
+            detections: list of detections to update.
+        """
+        for detection in detections:
+            detection["job_id"] = self.job_id
+            self.db.add(Detection(**detection))
+        self.db.commit()
+
+    def update_tracks(self, track_messages: List[Dict[str, Any]]) -> None:
+        """Updates the database with tracks."""
         for track_message in track_messages:
-            crops = track_message.pop("crops")
+            detection_ids = track_message.pop("detection_ids")
             track_message["class_name"] = self.class_names[track_message.pop("class_id")]
             # check to see if track_id already exists, if so, update it, else add it
             existing_track = self.db.query(Track).filter(Track.track_id == track_message["track_id"]).first()
@@ -73,15 +84,13 @@ class SQLDatabase:
             else:
                 self.db.add(Track(**track_message, job_id=self.job_id))
 
-            # check to see if track has same number of images, if not, add the images
-            existing_images = self.db.query(Detection).filter(Detection.track_id == track_message["track_id"]).all()
-            if len(existing_images) != len(crops):
-                image = Detection(
-                    frame_number=track_message["curr_frame_number"],
-                    image_base64=encode_image(crops[-1]),
-                    track_id=track_message["track_id"],
-                )
-                self.db.add(image)
+            self.db.flush()
+
+            for detection_id in detection_ids:
+                detection = self.db.query(Detection).filter(Detection.detection_id == detection_id).first()
+                if detection:
+                    detection.track_id = track_message["track_id"]
+
         self.db.commit()
 
     def add_frame(self, frame: np.ndarray, frame_number: int) -> None:
@@ -90,13 +99,13 @@ class SQLDatabase:
         Args:
             frame: frame to add.
         """
-        frame_base64 = encode_image(frame)
+        image_base64 = encode_image(frame)
         self.db.add(
             Frame(
                 frame_number=frame_number,
-                frame_base64=frame_base64,
-                time_created=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                image_caption=generate_frame_caption(frame_base64) if self.create_image_captions else None,
+                image_base64=image_base64,
+                timestamp=datetime.timezone.utc,
+                image_caption=generate_frame_caption(image_base64) if self.create_image_captions else None,
                 job_id=self.job_id,
             )
         )

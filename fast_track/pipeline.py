@@ -4,14 +4,14 @@ import logging
 import os
 import tempfile
 from threading import Thread
-from typing import Optional
 from types import TracebackType
+from typing import Optional
 
 import cv2
 
+from .databases import SQLDatabase
 from .detectors import ObjectDetector
 from .trackers import ObjectTracker
-from .databases import SQLDatabase
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -108,13 +108,15 @@ class Pipeline:
                 Thread(target=self.database.add_frame, args=(frame, self.frame_count)).start()
 
             # detection
-            class_ids, scores, boxes = self.detector(frame)
+            detections = self.detector(frame)
+            if self.database:
+                self.database.update_detections(detections)
 
             # tracking
             if self.tracker:
-                track_messages = self.tracker.update(boxes, scores, class_ids, frame)
+                track_messages = self.tracker.update(detections, frame)
                 if self.database:
-                    self.database.update(track_messages)
+                    self.database.update_tracks(track_messages)
 
             # write processed frame to output file
             self.outfile.write(frame)

@@ -9,7 +9,7 @@ from .base_track import BaseTrack, TrackState
 class STrack(BaseTrack):
     shared_kalman = KalmanFilter()
 
-    def __init__(self, tlwh, score, class_id):
+    def __init__(self, tlwh, det_id, score, class_id):
         # wait activate
         self._tlwh = np.asarray(tlwh, dtype=np.float64)
         self.kalman_filter = None
@@ -18,6 +18,7 @@ class STrack(BaseTrack):
         self.is_activated = False
 
         self.crops = []
+        self.detection_ids = set(det_id)
 
         self.score = score
         self.tracklet_len = 0
@@ -25,7 +26,12 @@ class STrack(BaseTrack):
         self.class_id = class_id
         self.class_id_history = {class_id: 1}
 
-        center_x, center_y, _, _, = self.tlwh_to_xyah(tlwh).astype(int).tolist()
+        (
+            center_x,
+            center_y,
+            _,
+            _,
+        ) = self.tlwh_to_xyah(tlwh).astype(int).tolist()
         self.location = (center_x, center_y)
 
     def predict(self):
@@ -74,13 +80,11 @@ class STrack(BaseTrack):
         self.score = new_track.score
         self.update_class_id(new_track.class_id)
 
-    def update(self, new_track, frame_id):
-        """
-        Update a matched track
-        :type new_track: STrack
-        :type frame_id: int
-        :type update_feature: bool
-        :return:
+    def update(self, new_track, frame_id) -> None:
+        """Update a matched track
+        Args:
+            new_track: new track
+            frame_id: frame id
         """
         self.frame_id = frame_id
         self.tracklet_len += 1
@@ -90,6 +94,7 @@ class STrack(BaseTrack):
         self.state = TrackState.Tracked
         self.is_activated = True
 
+        self.detection_ids.update(new_track.detection_ids)
         self.score = new_track.score
         self.update_class_id(new_track.class_id)
 
