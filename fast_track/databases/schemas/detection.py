@@ -6,7 +6,8 @@ from sqlalchemy import Column, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, relationship
 from sqlalchemy.sql.sqltypes import JSON, DateTime
 
-from . import Base, Job
+from .base import Base
+from .job import Job
 
 
 class Detection(Base):
@@ -15,7 +16,7 @@ class Detection(Base):
     __tablename__ = "detections"
     id = Column(Integer, primary_key=True)
     detection_id = Column(Integer, nullable=False)
-    timestamp = Column(DateTime, default=datetime.timezone.utc)
+    timestamp = Column(DateTime, default=datetime.datetime.now)
     class_id = Column(Integer, nullable=False)
     class_name = Column(String, nullable=False)
     bbox = Column(JSON, nullable=False)
@@ -24,4 +25,4 @@ class Detection(Base):
     track_id = Column(Integer, ForeignKey("tracks.id"), nullable=True)
     track = relationship("Track", back_populates="detections")
     job_id = Column(Integer, ForeignKey("jobs.job_id"))
-    job: Mapped["Job"] = relationship(back_populates="frames")
+    job: Mapped["Job"] = relationship(back_populates="detections")

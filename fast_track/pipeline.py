@@ -66,6 +66,8 @@ class Pipeline:
         self.interval_frames = int(fps * self.interval_seconds)
         self.frame_count = 0
         self.frames = []
+        # Threads
+        self.threads = []
 
     def __enter__(self):
         """Context manager enter."""
@@ -88,11 +90,10 @@ class Pipeline:
         self.outfile.release()
         cv2.destroyAllWindows()
         logger.info("__exit__ | Camera and output file released.")
-        if self.database:
-            logger.info("__exit__ | Closing database connection.")
-            self.database.commit()
-            self.database.close()
-            logger.info("__exit__ | Database connection closed.")
+        # Join threads
+        for thread in self.threads:
+            if thread:
+                thread.join()
 
     def run(self) -> None:
         """Runs object tracking pipeline."""
@@ -105,18 +106,22 @@ class Pipeline:
             # add frame to database
             if self.frame_count % self.interval_frames == 0 and self.database:
                 logger.info("run | Adding frame %s to database.", self.frame_count)
-                Thread(target=self.database.add_frame, args=(frame, self.frame_count)).start()
+                self.threads.append(Thread(target=self.database.add_frame, args=(frame, self.frame_count)).start())
 
             # detection
             detections = self.detector(frame)
             if self.database:
-                self.database.update_detections(detections)
+                self.threads.append(
+                    Thread(target=self.database.update_detections, kwargs={"detections": detections}).start()
+                )
 
             # tracking
             if self.tracker:
                 track_messages = self.tracker.update(detections, frame)
                 if self.database:
-                    self.database.update_tracks(track_messages)
+                    self.threads.append(
+                        Thread(target=self.database.update_tracks, kwargs={"track_messages": track_messages}).start()
+                    )
 
             # write processed frame to output file
             self.outfile.write(frame)

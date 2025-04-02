@@ -14,9 +14,8 @@ class Frame(Base):
 
     __tablename__ = "frames"
     id = Column(Integer, primary_key=True)
-    frame_id = Column(Integer, primary_key=True)
     frame_number = Column(Integer, nullable=False)
-    timestamp = Column(DateTime, default=datetime.timezone.utc)
+    timestamp = Column(DateTime, default=datetime.datetime.now)
     image_base64 = Column(String, nullable=False)
     image_caption = Column(String, nullable=True)
     job_id = Column(Integer, ForeignKey("jobs.job_id"))

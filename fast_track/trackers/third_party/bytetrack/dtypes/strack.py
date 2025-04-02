@@ -17,8 +17,7 @@ class STrack(BaseTrack):
         self.covariance = None
         self.is_activated = False
 
-        self.crops = []
-        self.detection_ids = set(det_id)
+        self.detection_ids = set([det_id])
 
         self.score = score
         self.tracklet_len = 0
@@ -107,20 +106,6 @@ class STrack(BaseTrack):
         self.class_id_history[class_id] = self.class_id_history.get(class_id, 1) + 1
         self.class_id = max(self.class_id_history, key=self.class_id_history.get)
 
-    def update_crops(self, frame: np.ndarray) -> None:
-        """Update crops.
-
-        Args:
-            frame: frame.
-        """
-        tx1, ty1, tw, th = self._tlwh.astype(int)
-        x1 = max(0, tx1)
-        y1 = max(0, ty1)
-        x2 = min(frame.shape[1], tx1 + tw)
-        y2 = min(frame.shape[0], ty1 + th)
-        crop = frame[y1:y2, x1:x2, :].copy()
-        self.crops.append(crop)
-
     @property
     # @jit(nopython=True)
     def tlwh(self):
@@ -179,8 +164,8 @@ class STrack(BaseTrack):
         track_message = super().get_track_message()
         track_message.update(
             {
-                "crops": self.crops,
                 "class_id": self.class_id,
+                "detection_ids": list(self.detection_ids),
             }
         )
         return track_message

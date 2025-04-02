@@ -92,7 +92,7 @@ class BYTETracker(ObjectTracker):
             detections = [
                 STrack(
                     tlwh=STrack.tlbr_to_tlwh(tlbr),
-                    det_id=det_id,
+                    det_id=int(det_id),
                     score=s,
                     class_id=class_id,
                 )
@@ -134,7 +134,7 @@ class BYTETracker(ObjectTracker):
         if len(dets_second) > 0:
             """Detections"""
             detections_second = [
-                STrack(tlwh=STrack.tlbr_to_tlwh(tlbr), det_id=det_id, score=s, class_id=class_id)
+                STrack(tlwh=STrack.tlbr_to_tlwh(tlbr), det_id=int(det_id), score=s, class_id=class_id)
                 for (tlbr, det_id, s, class_id) in zip(dets_second, det_ids_second, scores_second, class_ids_second)
             ]
         else:
@@ -178,7 +178,6 @@ class BYTETracker(ObjectTracker):
             if track.score < self.det_thresh:
                 continue
             track.activate(self.kalman_filter, self.frame_id)
-            track.update_crops(frame)
             activated_stracks.append(track)
         """ Step 5: Update state"""
         for track in self.lost_stracks:

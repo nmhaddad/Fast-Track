@@ -125,7 +125,7 @@ class ObjectDetector(metaclass=ABCMeta):
                 "bbox": box.tolist(),
                 "confidence": score,
                 "frame_number": self.frame_number,
-                "timestamp": datetime.timezone.utc,
+                "timestamp": datetime.datetime.now(datetime.timezone.utc),
             }
             for detection_id, (class_id, box, score) in enumerate(zip(class_ids, boxes, scores))
         ]
