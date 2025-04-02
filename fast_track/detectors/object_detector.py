@@ -122,7 +122,7 @@ class ObjectDetector(metaclass=ABCMeta):
                 "detection_id": detection_id + self.total_detections,
                 "class_id": class_id,
                 "class_name": self.names[class_id],
-                "bbox": box.tolist(),
+                "bbox": box,
                 "confidence": score,
                 "frame_number": self.frame_number,
                 "timestamp": datetime.datetime.now(datetime.timezone.utc),

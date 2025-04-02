@@ -42,9 +42,9 @@ class SQLDatabase:
         """Connects to the database and creates tables if they don't exist."""
         session = self.SessionFactory
         job = Job(job_name=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        self.job_id = job.job_id
         session.add(job)
         session.commit()
+        self.job_id = job.job_id
         session.close()
 
     def update_detections(self, detections: List[Dict[str, Any]]) -> None:
@@ -57,7 +57,13 @@ class SQLDatabase:
         detection_objects = [
             Detection(
                 job_id=self.job_id,
-                **detection,
+                detection_id=detection["detection_id"],
+                class_id=int(detection["class_id"]),
+                class_name=detection["class_name"],
+                bbox=detection["bbox"].astype(np.int32).tolist(),
+                confidence=float(detection["confidence"]),
+                frame_number=int(detection["frame_number"]),
+                timestamp=detection["timestamp"],
             )
             for detection in detections
         ]
