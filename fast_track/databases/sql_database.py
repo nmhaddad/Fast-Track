@@ -1,15 +1,15 @@
 """Database class to store information about tracks and detections."""
 
-from datetime import datetime
+import datetime
 import logging
 from typing import Any, Dict, List
 
 import numpy as np
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from .schemas import Base, Detection, Frame, Job, Track
-from .utils import generate_frame_caption, encode_image
+from .utils import encode_image, generate_frame_caption
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -28,61 +28,99 @@ class SQLDatabase:
         self.db_uri = db_uri
         self.class_names = class_names
         self.create_image_captions = create_image_captions
-
-        self.db = None
         self.job_id = None
 
-        self._connect_db()
-
-    def _connect_db(self) -> None:
-        """Connects to the database and creates tables if they don't exist."""
-        engine = create_engine(self.db_uri)
+        # Connect to the database and create tables if they don't exist
+        engine = create_engine(db_uri)
         Base.metadata.create_all(engine)
-        Session = sessionmaker(bind=engine)
-        session = Session()
-        self.db = session
-        job = Job(job_name=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        self.db.add(job)
-        self.db.commit()
+        # Create a SessionFactory for thread-safe sessions
+        self.SessionFactory = scoped_session(sessionmaker(bind=engine))
+
+        self._create_new_job()
+
+    def _create_new_job(self) -> None:
+        """Connects to the database and creates tables if they don't exist."""
+        session = self.SessionFactory
+        job = Job(job_name=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        session.add(job)
+        session.commit()
         self.job_id = job.job_id
+        session.close()
 
-    def close(self) -> None:
-        """Closes the database connection."""
-        self.db.close()
+    def update_detections(self, detections: List[Dict[str, Any]]) -> None:
+        """Updates the database with detections.
 
-    def commit(self) -> None:
-        """Commits the database session."""
-        self.db.commit()
+        Args:
+            detections: list of detections to update.
+        """
+        session = self.SessionFactory
+        detection_objects = [
+            Detection(
+                job_id=self.job_id,
+                detection_id=detection["detection_id"],
+                class_id=int(detection["class_id"]),
+                class_name=detection["class_name"],
+                bbox=detection["bbox"].astype(np.int32).tolist(),
+                confidence=float(detection["confidence"]),
+                frame_number=int(detection["frame_number"]),
+                timestamp=detection["timestamp"],
+            )
+            for detection in detections
+        ]
+        session.add_all(detection_objects)
+        session.commit()
+        session.close()
 
-    def update(self, track_messages: List[Dict[str, Any]]) -> None:
-        """Updates the database with tracks and detections."""
+    def update_tracks(self, track_messages: List[Dict[str, Any]]) -> None:
+        """Efficiently updates the database with tracks."""
+        session = self.SessionFactory
+
+        # Extract track IDs and detection IDs for bulk querying
+        track_ids = {tm["track_id"] for tm in track_messages}
+        detection_map = {tm["track_id"]: tm.pop("detection_ids") for tm in track_messages}
+
+        # Pre-fetch existing tracks in one query
+        existing_tracks = {
+            t.track_id: t for t in session.execute(select(Track).where(Track.track_id.in_(track_ids))).scalars().all()
+        }  # Converts list to a dictionary for O(1) lookups
+
+        # Batch insert/update tracks
+        new_tracks = []
         for track_message in track_messages:
-            crops = track_message.pop("crops")
+            track_id = track_message["track_id"]
             track_message["class_name"] = self.class_names[track_message.pop("class_id")]
-            # check to see if track_id already exists, if so, update it, else add it
-            existing_track = self.db.query(Track).filter(Track.track_id == track_message["track_id"]).first()
-            if existing_track:
-                existing_track.count = track_message["count"]
-                existing_track.is_activated = track_message["is_activated"]
-                existing_track.state = track_message["state"]
-                existing_track.score = track_message["score"]
-                existing_track.curr_frame_number = track_message["curr_frame_number"]
-                existing_track.time_since_update = track_message["time_since_update"]
-                existing_track.location = track_message["location"]
-                existing_track.class_name = track_message["class_name"]
-            else:
-                self.db.add(Track(**track_message, job_id=self.job_id))
 
-            # check to see if track has same number of images, if not, add the images
-            existing_images = self.db.query(Detection).filter(Detection.track_id == track_message["track_id"]).all()
-            if len(existing_images) != len(crops):
-                image = Detection(
-                    frame_number=track_message["curr_frame_number"],
-                    image_base64=encode_image(crops[-1]),
-                    track_id=track_message["track_id"],
-                )
-                self.db.add(image)
-        self.db.commit()
+            if track_id in existing_tracks:
+                track = existing_tracks[track_id]
+                track.count = track_message["count"]
+                track.is_activated = track_message["is_activated"]
+                track.state = track_message["state"]
+                track.score = track_message["score"]
+                track.curr_frame_number = track_message["curr_frame_number"]
+                track.time_since_update = track_message["time_since_update"]
+                track.location = track_message["location"]
+                track.class_name = track_message["class_name"]
+            else:
+                new_tracks.append(Track(**track_message, job_id=self.job_id))
+
+        if new_tracks:
+            session.add_all(new_tracks)  # Bulk insert new tracks
+
+        # Pre-fetch detections in one query
+        detection_ids = {d_id for d_list in detection_map.values() for d_id in d_list}
+        existing_detections = {
+            d.detection_id: d
+            for d in session.execute(select(Detection).where(Detection.detection_id.in_(detection_ids))).scalars().all()
+        }  # Converts list to a dictionary for O(1) lookups
+
+        # Update detection track IDs in bulk
+        for track_id, detection_ids in detection_map.items():
+            for detection_id in detection_ids:
+                if detection_id in existing_detections:
+                    existing_detections[detection_id].track_id = track_id
+
+        session.commit()
+        session.close()
 
     def add_frame(self, frame: np.ndarray, frame_number: int) -> None:
         """Adds a frame to the database Frames table.
@@ -90,17 +128,16 @@ class SQLDatabase:
         Args:
             frame: frame to add.
         """
-        frame_base64 = encode_image(frame)
-        self.db.add(
+        session = self.SessionFactory
+        image_base64 = encode_image(frame)
+        session.add(
             Frame(
                 frame_number=frame_number,
-                frame_base64=frame_base64,
-                time_created=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                image_caption=generate_frame_caption(frame_base64) if self.create_image_captions else None,
+                timestamp=datetime.datetime.now(datetime.timezone.utc),
+                image_base64=image_base64,
+                image_caption=generate_frame_caption(image_base64) if self.create_image_captions else None,
                 job_id=self.job_id,
             )
         )
-        try:
-            self.db.commit()
-        except Exception:
-            logger.warning("add_frame | Failed to add frame to database.")
+        session.commit()
+        session.close()

@@ -133,3 +133,4 @@ src/
 data/
 models/
 .env
+*.pth

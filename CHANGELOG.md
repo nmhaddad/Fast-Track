@@ -3,6 +3,9 @@
 ## Known Issues:
 - See GitHub Issues
 
+## v1.3.0 - Nate Haddad, 4/1/2025
+- Rewrite database code
+
 ## v1.2.2 - Nate Haddad, 3/31/2025
 - Update track messages
 
